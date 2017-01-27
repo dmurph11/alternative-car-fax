@@ -19,11 +19,18 @@ import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
 import android.location.LocationProvider;
+import android.net.Uri;
 import android.os.AsyncTask;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.PowerManager;
+import android.speech.RecognitionListener;
+import android.speech.RecognizerIntent;
+import android.speech.SpeechRecognizer;
+import android.speech.tts.TextToSpeech;
+import android.speech.tts.UtteranceProgressListener;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.Menu;
@@ -59,9 +66,11 @@ import com.google.inject.Inject;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 import retrofit.RestAdapter;
@@ -94,10 +103,16 @@ public class MainActivity extends RoboActivity implements ObdProgressListener, L
     private static final int SAVE_TRIP_NOT_AVAILABLE = 11;
     private static final int REQUEST_ENABLE_BT = 1234;
     private static boolean bluetoothDefaultIsEnable = false;
+    private TextToSpeech textToSpeech;
+    private Intent mSpeechRecognizerIntent;
+    private SpeechRecognizer mSpeechRecognizer;
 
     static {
         RoboGuice.setUseAnnotationDatabases(false);
     }
+
+    public TextView CoolantTempTextView;
+    public TextView CoolantTempWarningTextView;
 
     public Map<String, String> commandResult = new HashMap<String, String>();
     boolean mGpsIsStarted = false;
@@ -109,8 +124,8 @@ public class MainActivity extends RoboActivity implements ObdProgressListener, L
     private TripLog triplog;
     private TripRecord currentTrip;
 
-    @InjectView(R.id.compass_text)
-    private TextView compass;
+    //@InjectView(R.id.compass_text)
+   // private TextView compass;
     private final SensorEventListener orientListener = new SensorEventListener() {
 
         public void onSensorChanged(SensorEvent event) {
@@ -133,7 +148,7 @@ public class MainActivity extends RoboActivity implements ObdProgressListener, L
             } else if (x >= 292.5 && x < 337.5) {
                 dir = "NW";
             }
-            updateTextView(compass, dir);
+          //  updateTextView(compass, dir);
         }
 
         public void onAccuracyChanged(Sensor sensor, int accuracy) {
@@ -144,11 +159,11 @@ public class MainActivity extends RoboActivity implements ObdProgressListener, L
     private TextView btStatusTextView;
     @InjectView(R.id.OBD_STATUS)
     private TextView obdStatusTextView;
-    @InjectView(R.id.GPS_POS)
-    private TextView gpsStatusTextView;
+   // @InjectView(R.id.GPS_POS)
+   // private TextView gpsStatusTextView;
     @InjectView(R.id.vehicle_view)
     private LinearLayout vv;
-    @InjectView(R.id.data_table)
+   // @InjectView(R.id.data_table)
     private TableLayout tl;
     @Inject
     private SensorManager sensorManager;
@@ -179,7 +194,7 @@ public class MainActivity extends RoboActivity implements ObdProgressListener, L
                     sb.append(String.valueOf(mLastLocation.getLongitude()).substring(0, posLen));
                     sb.append(" Alt: ");
                     sb.append(String.valueOf(mLastLocation.getAltitude()));
-                    gpsStatusTextView.setText(sb.toString());
+                    //gpsStatusTextView.setText(sb.toString());
                 }
                 if (prefs.getBoolean(ConfigActivity.UPLOAD_DATA_KEY, false)) {
                     // Upload the current reading by http
@@ -243,8 +258,12 @@ public class MainActivity extends RoboActivity implements ObdProgressListener, L
     public static String LookUpCommand(String txt) {
         for (AvailableCommandNames item : AvailableCommandNames.values()) {
             if (item.getValue().equals(txt)) return item.name();
+            Log.d("ItemName",item.name());
+
         }
+        Log.d("LookUpCommand",txt);
         return txt;
+
     }
 
     public void updateTextView(final TextView view, final String txt) {
@@ -253,6 +272,7 @@ public class MainActivity extends RoboActivity implements ObdProgressListener, L
                 view.setText(txt);
             }
         });
+        //Log.d("updateTextView",txt);
     }
 
     public void stateUpdate(final ObdCommandJob job) {
@@ -279,8 +299,45 @@ public class MainActivity extends RoboActivity implements ObdProgressListener, L
         if (vv.findViewWithTag(cmdID) != null) {
             TextView existingTV = (TextView) vv.findViewWithTag(cmdID);
             existingTV.setText(cmdResult);
+            //Log.d("findViewWithTag",cmdResult);
+
         } else addTableRow(cmdID, cmdName, cmdResult);
         commandResult.put(cmdID, cmdResult);
+        Log.d("cmdID", cmdID);
+        Log.d("cmdName", cmdName + " | " + cmdResult);
+        //Log.d("findViewWithTag",cmdResult);
+
+        //Alternative Car Fax Action starts here
+        //We are parsing the crazy string looking for Engine coolant temp value and setting a variable to that value
+        //It is contantly updated by stuff above I don't understand
+        String Temp = "0";
+        if (cmdName.equals("Engine Coolant Temperature")) {
+            Temp = cmdResult;
+            //Log.d("pleaseWork", Temp);
+            //Parsing String into Integer
+            int TempInt=Integer.parseInt(Temp.replaceAll("[\\D]", ""));
+
+            Temp = String.valueOf(TempInt);
+            Log.d("pleaseWork", Temp);
+            CoolantTempTextView=(TextView) findViewById(R.id.CoolantTempTextView);
+            CoolantTempTextView.setText(Temp);
+            if(TempInt>100){
+                CoolantTempWarningTextView=(TextView) findViewById(R.id.warningBox);
+                CoolantTempWarningTextView.setText("AHHHHHHHHH");
+                String toSpeak = "Coolant above 100";
+                textToSpeech(toSpeak);
+            }
+            else{
+                CoolantTempWarningTextView=(TextView) findViewById(R.id.warningBox);
+                CoolantTempWarningTextView.setText("");
+            };
+
+        }
+
+        //Parsing String into Integer
+        //int TempInt=Integer.parseInt(Temp.replaceAll("[\\D]", ""));
+
+
         updateTripStatistic(job, cmdID);
     }
 
@@ -291,12 +348,12 @@ public class MainActivity extends RoboActivity implements ObdProgressListener, L
             if (mLocProvider != null) {
                 mLocService.addGpsStatusListener(this);
                 if (mLocService.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
-                    gpsStatusTextView.setText(getString(R.string.status_gps_ready));
+                    //gpsStatusTextView.setText(getString(R.string.status_gps_ready));
                     return true;
                 }
             }
         }
-        gpsStatusTextView.setText(getString(R.string.status_gps_no_support));
+       // gpsStatusTextView.setText(getString(R.string.status_gps_no_support));
         showDialog(NO_GPS_SUPPORT);
         Log.e(TAG, "Unable to get GPS PROVIDER");
         // todo disable gps controls into Preferences
@@ -321,6 +378,48 @@ public class MainActivity extends RoboActivity implements ObdProgressListener, L
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        mSpeechRecognizer = SpeechRecognizer.createSpeechRecognizer(this);
+        mSpeechRecognizerIntent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+        mSpeechRecognizerIntent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+                RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+        mSpeechRecognizerIntent.putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE,
+                this.getPackageName());
+
+        SpeechRecognitionListener listener = new SpeechRecognitionListener();
+        mSpeechRecognizer.setRecognitionListener(listener);
+
+        textToSpeech = new TextToSpeech(getApplicationContext(), new TextToSpeech.OnInitListener() {
+            @Override
+            public void onInit(int status) {
+                if(status != TextToSpeech.ERROR) {
+                    textToSpeech.setLanguage(Locale.UK);
+                }
+            }
+        });
+        if(Build.VERSION.SDK_INT  >= Build.VERSION_CODES.LOLLIPOP){
+            textToSpeech.setOnUtteranceProgressListener(new UtteranceProgressListener() {
+                @Override
+                public void onStart(String utteranceId) {
+                    Log.d(TAG, "onStart");
+                }
+
+                @Override
+                public void onDone(String utteranceId) {
+                    Log.d(TAG, "onDone");
+                    MainActivity.this.runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            mSpeechRecognizer.startListening(mSpeechRecognizerIntent);
+                        }
+                    });
+                }
+                @Override
+                public void onError(String utteranceId) {
+                    Log.d(TAG, "onError");
+                }
+            });
+        }
+
         super.onCreate(savedInstanceState);
 
         final BluetoothAdapter btAdapter = BluetoothAdapter.getDefaultAdapter();
@@ -339,7 +438,16 @@ public class MainActivity extends RoboActivity implements ObdProgressListener, L
         
         obdStatusTextView.setText(getString(R.string.status_obd_disconnected));
     }
-
+    public void textToSpeech(String toSpeak){
+        if(Build.VERSION.SDK_INT  >= Build.VERSION_CODES.LOLLIPOP){
+            String utteranceId=this.hashCode() + "";
+            textToSpeech.speak(toSpeak, TextToSpeech.QUEUE_FLUSH, null, utteranceId);
+        }else{
+            HashMap<String, String> map = new HashMap<>();
+            map.put(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, "MessageId");
+            textToSpeech.speak(toSpeak, TextToSpeech.QUEUE_FLUSH, map);
+        }
+    }
     @Override
     protected void onStart() {
         super.onStart();
@@ -450,7 +558,7 @@ public class MainActivity extends RoboActivity implements ObdProgressListener, L
     private void startLiveData() {
         Log.d(TAG, "Starting live data..");
 
-        tl.removeAllViews(); //start fresh
+        //tl.removeAllViews(); //start fresh
         doBindService();
 
         currentTrip = triplog.startTrip();
@@ -463,7 +571,7 @@ public class MainActivity extends RoboActivity implements ObdProgressListener, L
         if (prefs.getBoolean(ConfigActivity.ENABLE_GPS_KEY, false))
             gpsStart();
         else
-            gpsStatusTextView.setText(getString(R.string.status_gps_not_used));
+           // gpsStatusTextView.setText(getString(R.string.status_gps_not_used));
 
         // screen won't turn off until wakeLock.release()
         wakeLock.acquire();
@@ -590,7 +698,7 @@ public class MainActivity extends RoboActivity implements ObdProgressListener, L
         value.setTag(id);
         tr.addView(name);
         tr.addView(value);
-        tl.addView(tr, params);
+       // tl.addView(tr, params);
     }
 
     /**
@@ -651,13 +759,13 @@ public class MainActivity extends RoboActivity implements ObdProgressListener, L
 
         switch (event) {
             case GpsStatus.GPS_EVENT_STARTED:
-                gpsStatusTextView.setText(getString(R.string.status_gps_started));
+              // gpsStatusTextView.setText(getString(R.string.status_gps_started));
                 break;
             case GpsStatus.GPS_EVENT_STOPPED:
-                gpsStatusTextView.setText(getString(R.string.status_gps_stopped));
+               // gpsStatusTextView.setText(getString(R.string.status_gps_stopped));
                 break;
             case GpsStatus.GPS_EVENT_FIRST_FIX:
-                gpsStatusTextView.setText(getString(R.string.status_gps_fix));
+              //  gpsStatusTextView.setText(getString(R.string.status_gps_fix));
                 break;
             case GpsStatus.GPS_EVENT_SATELLITE_STATUS:
                 break;
@@ -681,7 +789,7 @@ public class MainActivity extends RoboActivity implements ObdProgressListener, L
             mLocService.requestLocationUpdates(mLocProvider.getName(), getGpsUpdatePeriod(prefs), getGpsDistanceUpdatePeriod(prefs), this);
             mGpsIsStarted = true;
         } else {
-            gpsStatusTextView.setText(getString(R.string.status_gps_no_support));
+           // gpsStatusTextView.setText(getString(R.string.status_gps_no_support));
         }
     }
 
@@ -689,7 +797,7 @@ public class MainActivity extends RoboActivity implements ObdProgressListener, L
         if (mGpsIsStarted) {
             mLocService.removeUpdates(this);
             mGpsIsStarted = false;
-            gpsStatusTextView.setText(getString(R.string.status_gps_stopped));
+           // gpsStatusTextView.setText(getString(R.string.status_gps_stopped));
         }
     }
 
@@ -722,4 +830,73 @@ public class MainActivity extends RoboActivity implements ObdProgressListener, L
         }
 
     }
+    protected class SpeechRecognitionListener implements RecognitionListener {
+
+        public void onBeginningOfSpeech() {
+
+        }
+
+        public void onBufferReceived(byte[] buffer) {
+
+        }
+
+        public void onEndOfSpeech() {
+            //Log.d(TAG, "onEndOfSpeech");
+        }
+
+        public void onError(int error) {
+            //mSpeechRecognizer.startListening(mSpeechRecognizerIntent);
+
+            //Log.d(TAG, "error = " + error);
+        }
+
+        public void onEvent(int eventType, Bundle params) {
+            try{
+                //AIzaSyCxUFkq50y3jlxQ3cmF9J5sAAMsXBKUgK0
+            }catch (SecurityException e){
+
+            }
+        }
+
+        public void onPartialResults(Bundle partialResults) {
+
+        }
+
+        public void onReadyForSpeech(Bundle params) {
+
+        }
+
+        public void onResults(Bundle results) {
+            //Log.d(TAG, "onResults"); //$NON-NLS-1
+            mSpeechRecognizer.stopListening();
+            ArrayList<String> matches = results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
+            String reply = matches.get(0);
+            Log.d(TAG, "reply : "+reply);
+            // txtSpeechInput.setText(reply);
+                if(reply.equalsIgnoreCase("yes")){
+                    textToSpeech("Ok getting the list of car care shops near you. Select from the list. firestone, autozone, autoshop");
+                    try {
+                        Thread.sleep(3000);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }else if(reply.equalsIgnoreCase("firestone")){
+                    textToSpeech("Wait opening the navigation to firestone");
+                    Uri gmmIntentUri = Uri.parse("google.navigation:q=Firestone Complete Auto Care, 892 E Main St, Stamford, CT 06902");
+                    Intent mapIntent = new Intent(Intent.ACTION_VIEW, gmmIntentUri);
+                    mapIntent.setPackage("com.google.android.apps.maps");
+                    startActivity(mapIntent);
+                    //mapSpeech = false;
+                    mSpeechRecognizer.stopListening();
+                }else if(reply.equalsIgnoreCase("no")){
+                    textToSpeech("ok, Good day sandeep");
+                    //mapSpeech = false;
+                    mSpeechRecognizer.stopListening();
+                }
+        }
+        public void onRmsChanged(float rmsdB) {
+        }
+    }
+
+
 }

@@ -8,84 +8,40 @@
     android:orientation="vertical">
 
     <TableRow
-        android:layout_width="fill_parent"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content">
 
         <TextView
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="2"
-            android:tag="SPEED"
-            android:text="@string/text_zero"
-            android:textSize="@dimen/abc_text_size_display_3_material" />
+            android:text="Engine Coolant Temp"
+            android:layout_width="159dp"
+            android:layout_height="match_parent"
+            android:id="@+id/textView3"
+            android:textSize="18sp" />
 
         <TextView
-            android:id="@+id/compass_text"
-            android:layout_width="0dp"
+            android:text="0"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:gravity="end"
-            android:text="@string/text_orientation_default"
-            android:textSize="@dimen/abc_text_size_display_3_material" />
+            android:id="@+id/CoolantTempTextView"
+            android:typeface="normal"
+            android:textAppearance="@style/TextAppearance.AppCompat.Display2"
+            android:layout_width="match_parent" />
     </TableRow>
 
     <TableRow
         android:layout_width="fill_parent"
         android:layout_height="wrap_content">
 
-        <TextView
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:gravity="center"
-            android:tag="FUEL_CONSUMPTION"
-            android:text="@string/text_consumption_default" />
-
-        <TextView
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:gravity="center"
-            android:tag="ENGINE_RUNTIME"
-            android:text="@string/text_runtime_default" />
-
-        <TextView
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:gravity="center"
-            android:tag="ENGINE_RPM"
-            android:text="" />
     </TableRow>
-
-    <ScrollView
-        android:id="@+id/data_scroll"
-        android:layout_width="fill_parent"
-        android:layout_height="0dp"
-        android:layout_gravity="top"
-        android:layout_margin="10dp"
-        android:layout_weight="1"
-        android:elevation="2dp"
-        android:outlineProvider="bounds">
-
-        <TableLayout
-            android:id="@+id/data_table"
-            android:layout_width="fill_parent"
-            android:layout_height="wrap_content"
-            android:stretchColumns="*"></TableLayout>
-    </ScrollView>
 
     <TableRow
         android:layout_width="fill_parent"
         android:layout_height="wrap_content">
 
-        <TextView
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:gravity="center"
-            android:text="@string/text_gps"
-            android:textSize="@dimen/abc_text_size_medium_material" />
+    </TableRow>
+
+    <TableRow
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content">
 
         <TextView
             android:layout_width="0dp"
@@ -111,14 +67,6 @@
         android:layout_height="wrap_content">
 
         <TextView
-            android:id="@+id/GPS_POS"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:gravity="center"
-            android:text="" />
-
-        <TextView
             android:id="@+id/BT_STATUS"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
@@ -134,5 +82,11 @@
             android:gravity="center"
             android:text="" />
     </TableRow>
+
+    <TextView
+        android:text="Looking Good"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:id="@+id/warningBox" />
 
 </LinearLayout>
